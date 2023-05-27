@@ -22,3 +22,12 @@
 - Python 3.10.X
 - установить все необходимые библиотеки из файла requirements.txt (pip install -r requirements.txt)
 - в файле config.py ввести свои API-KEY от ВК и Телеграм бота, а так же айди группы ВК и айди обсуждения ВК
+
+Рекомендуемый запуск бота из виртуального окружения:
+
+для Windows - .\venv\Scripts\Activate.ps1
+для Linux/MacOs - source /venv/Scripts/activate
+После чего уже можно скачивать необходимые библиотеки
+Для выхода из виртуального окружения - deactivate
+
+
