@@ -26,8 +26,11 @@
 Рекомендуемый запуск бота из виртуального окружения:
 
 для Windows - .\venv\Scripts\Activate.ps1
+
 для Linux/MacOs - source /venv/Scripts/activate
+
 После чего уже можно скачивать необходимые библиотеки
+
 Для выхода из виртуального окружения - deactivate
 
 
