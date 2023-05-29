@@ -267,6 +267,9 @@ async def autopost(message: types.Message):
         autoposting_statuses[user_id] = True
         await message.reply("Автопостинг включен.")
 
+last_news_id = None
+last_file_id = None
+
 @dp.message_handler()
 async def handle_feedback_message(message: types.Message):
     global feedback_enabled
@@ -277,35 +280,35 @@ async def handle_feedback_message(message: types.Message):
 
 #parser news in group
 async def check_new():
-    last_post_id = None
+    global last_news_id
 
     while True:
-        new_post =  vk.wall.get(owner_id=-1014995, count=10, extended=10)
+        new_post = vk.wall.get(owner_id=-217559086, count=1)  # Получаем только одну новость
 
-        if last_post_id is not None and new_post['items'][0]['id'] <= last_post_id:
-            # Пост не изменился, пропускаем
+        post_id = new_post['items'][0]['id']
+        if post_id == last_news_id:
             await asyncio.sleep(10)
             continue
 
-        last_post_id = new_post['items'][0]['id']
+        last_news_id = post_id
         post_text = new_post['items'][0]['text']
-        post_link = f"https://vk.com/perm_college_radio?w=wall-{new_post['items'][0]['owner_id']}_{last_post_id}"
-        post_short_link = vk_session.method('utils.getShortLink', {'url': post_link})['short_url'] 
+        post_link = f"https://vk.com/perm_college_radio?w=wall-{new_post['items'][0]['owner_id']}_{last_news_id}"
+        # post_short_link = vk_session.method('utils.getShortLink', {'url': post_link})['short_url'] 
 
         media_group = []
         photo_urls = []
         attachments = new_post['items'][0].get('attachments', [])
         for attachment in attachments:
             if attachment['type'] == 'photo':
-               photo_url = attachment['photo']['sizes'][-1]['url']
-               photo_urls.append(photo_url)
-               media_group.append(InputMediaPhoto(photo_url))
+                photo_url = attachment['photo']['sizes'][-1]['url']
+                photo_urls.append(photo_url)
+                media_group.append(InputMediaPhoto(photo_url))
 
-        message = f"Новый пост в группе ВК!\n\n{post_text}\n{post_short_link}"
+        message = f"Новый пост в группе ВК!\n\n{post_text}\n\n{post_link}"
         # Отправляем фотографии и текст в одном сообщении
         for user_id in users:
             if autoposting_statuses.get(user_id, True):
-                if len(media_group) > 0:  # добавить проверку на наличие элементов в media_group
+                if len(media_group) > 0:
                     if len(media_group) > 1:
                         await bot.send_media_group(chat_id=user_id, media=media_group)
                     else:
@@ -323,6 +326,8 @@ async def download_file(url, file_path):
                 f.write(file_data)
 
 async def vk_parse():
+    global last_file_id
+
     vk_session = vk_api.VkApi(token=VKTOKEN)
     vk = vk_session.get_api()
     last_comment_id = 0
@@ -338,6 +343,12 @@ async def vk_parse():
                 attachments = last_comment["attachments"]
                 doc_attachments = [a for a in attachments if a["type"] == "doc" and a["doc"]["ext"] == "xlsx"]
                 if doc_attachments:
+                    file_id = doc_attachments[0]["doc"]["id"]
+                    if file_id == last_file_id:
+                        await asyncio.sleep(10)
+                        continue
+
+                    last_file_id = file_id
                     url = doc_attachments[0]["doc"]["url"]
                     title = "file.xlsx"
                     file_path = os.path.join("files", title)
@@ -356,7 +367,7 @@ async def vk_parse():
 async def main():
     while True:
         try:
-            await vk_parse()
+            await asyncio.gather(check_new(), vk_parse())
         except Exception as e:
             print(f"An error occurred: {e}")
             await asyncio.sleep(10)
