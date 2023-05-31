@@ -334,10 +334,6 @@ async def autopost(message: types.Message):
     autoposting_statuses[user_id] = True
     await message.reply("Автопостинг включен.")
 
-
-last_news_id = None
-last_file_id = None
-
 @dp.message_handler()
 async def handle_feedback_message(message: types.Message):
     global feedback_enabled
@@ -346,12 +342,16 @@ async def handle_feedback_message(message: types.Message):
         feedback_enabled = False
         await message.reply('Спасибо за вашу обратную связь!')
 
+
+last_news_id = None
+last_file_id = None
+
 #parser news in group
 async def check_new():
     global last_news_id
 
     while True:
-        new_post = vk.wall.get(owner_id=-217559086, count=1)  # Получаем только одну новость
+        new_post = vk.wall.get(owner_id=-1014995, count=10) 
 
         post_id = new_post['items'][0]['id']
         if post_id == last_news_id:
@@ -384,20 +384,10 @@ async def check_new():
                 await bot.send_message(chat_id=user_id, text=message)
         await asyncio.sleep(10) 
 
-#parser tables
-
-async def download_file(url, file_path):
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url) as response:
-            file_data = await response.read()
-            with open(file_path, "wb") as f:
-                f.write(file_data)
-
-async def vk_parse():
+#parser tables and download file
+async def vk_parse_and_download():
     global last_file_id
-
-    vk_session = vk_api.VkApi(token=VKTOKEN)
-    vk = vk_session.get_api()
+    
     last_comment_id = 0
     if not os.path.exists("files"):
         os.makedirs("files")
@@ -420,27 +410,31 @@ async def vk_parse():
                     url = doc_attachments[0]["doc"]["url"]
                     title = "file.xlsx"
                     file_path = os.path.join("files", title)
-                    await download_file(url, file_path)
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(url) as response:
+                            file_data = await response.read()
+                            with open(file_path, "wb") as f:
+                                f.write(file_data)
                     message = f"Файл с расписанием обновлен, можете проверить свое расписание!"
                     for user in users:
                         await bot.send_message(chat_id=user, text=message)
                 else:
-                    print("Last comment without attachments.")
+                    print("Коментарии не найдены.")
             else:
-                print("Last comment without attachments.")
+                print("Коментарии не найдены.")
         else:
-            print("No new comments.")
+            print("Нет новых коментариев.")
         await asyncio.sleep(10)
 
 async def main():
     while True:
         try:
-            await asyncio.gather(check_new(), vk_parse())
+            await asyncio.gather(check_new(), vk_parse_and_download())
         except Exception as e:
-            print(f"An error occurred: {e}")
+            print(f"Произошла ошибка: {e}")
             await asyncio.sleep(10)
 
 if __name__ == '__main__':
-  asyncio.get_event_loop().create_task(check_new())
-  asyncio.get_event_loop().create_task(main())
-  executor.start_polling(dp, skip_updates=True)
+    loop = asyncio.get_event_loop()
+    loop.create_task(main())
+    executor.start_polling(dp, skip_updates=True, loop=loop)
