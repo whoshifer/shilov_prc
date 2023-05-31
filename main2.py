@@ -17,23 +17,10 @@ from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
 from courses import courses
-
-course1 = [
-  types.InlineKeyboardButton(text=group, callback_data=group)
-  for group in courses["1 курс"]
-]
-course2 = [
-  types.InlineKeyboardButton(text=group, callback_data=group)
-  for group in courses["2 курс"]
-]
-course3 = [
-  types.InlineKeyboardButton(text=group, callback_data=group)
-  for group in courses["3 курс"]
-]
-course4 = [
-  types.InlineKeyboardButton(text=group, callback_data=group)
-  for group in courses["4 курс"]
-]
+course1 = [types.InlineKeyboardButton(text=group, callback_data=group) for group in courses["1 курс"]]
+course2 = [types.InlineKeyboardButton(text=group, callback_data=group) for group in courses["2 курс"]]
+course3 = [types.InlineKeyboardButton(text=group, callback_data=group) for group in courses["3 курс"]]
+course4 = [types.InlineKeyboardButton(text=group, callback_data=group) for group in courses["4 курс"]]
 
 TGTOKEN = config.settings["TGTOKEN"]
 VKTOKEN = config.settings["VKTOKEN"]
@@ -219,109 +206,78 @@ async def back(callback_query: types.CallbackQuery):
 
 @dp.callback_query_handler(lambda callback_query: True)
 async def group_name_input(callback_query: CallbackQuery):
-  df = pd.read_excel('files/file.xlsx', header=None)
-  group_name = callback_query.data
-  group_column = df.loc[6].eq(group_name).idxmax()
+    df = pd.read_excel('files/file.xlsx', header=None)
+    group_name = callback_query.data
+    group_column = df.loc[6].eq(group_name).idxmax()
 
-  data = [[], [], [], [], [], []]
+    data = [[], [], [], [], [], []]
+    
+    for day, rows in enumerate([(9, 26), (27, 44), (45, 62), (63, 80), (81, 98), (99, 116)]):
+        for row in range(rows[0], rows[1] + 1):
+            dataday = str(df.loc[row, 0])
+            time = str(df.loc[row, 2])
+            classroom = str(df.loc[row, group_column + 1])
+            subject = str(df.loc[row, group_column])
+            if isinstance(subject, float):
+                subject = ''
 
-  for day, rows in enumerate([(9, 26), (27, 44), (45, 62), (63, 80), (81, 98),
-                              (99, 116)]):
-    for row in range(rows[0], rows[1] + 1):
-      dataday = str(df.loc[row, 0])
-      time = str(df.loc[row, 2])
-      classroom = str(df.loc[row, group_column + 1])
-      subject = str(df.loc[row, group_column])
-      if isinstance(subject, float):
-        subject = ''
+            wrapped_subject = textwrap.fill(subject, width=25).split('\n')
 
-      wrapped_subject = textwrap.fill(subject, width=25).split('\n')
+            data[day].append([time[:11] if not pd.isnull(time) else '', 
+                              wrapped_subject[0][:25] if wrapped_subject else '', 
+                              classroom[:10] if not pd.isnull(classroom) else ''])
+            for line in wrapped_subject[1:]:
+                data[day].append(['', line[:25], ''])
 
-      data[day].append([
-        time[:11] if not pd.isnull(time) else '',
-        wrapped_subject[0][:25] if wrapped_subject else '',
-        classroom[:10] if not pd.isnull(classroom) else ''
-      ])
-      for line in wrapped_subject[1:]:
-        data[day].append(['', line[:25], ''])
+    days_of_week = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
+    dfs = []
+    for table_data in data:
+        df_day = pd.DataFrame(table_data, columns=['Время', 'Дисциплина', 'Кабинет']).replace(pd.NA, '').replace('nan', '')
+        dfs.append(df_day.dropna(how='all'))
 
-  days_of_week = [
-    'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'
-  ]
-  dfs = []
-  for table_data in data:
-    df_day = pd.DataFrame(table_data,
-                          columns=['Время', 'Дисциплина',
-                                   'Кабинет']).replace(pd.NA,
-                                                       '').replace('nan', '')
-    dfs.append(df_day.dropna(how='all'))
+    photos = []
 
-  photos = []
+    for day, df_day in enumerate(dfs):
+        img = Image.new('RGB', (800, 1400), color='white') 
+        d = ImageDraw.Draw(img)
+        d.rectangle([(0, 120), (800, 200)], fill=(106, 147, 176)) 
 
-  for day, df_day in enumerate(dfs):
-    img = Image.new('RGB', (800, 1400), color='white')
-    d = ImageDraw.Draw(img)
-    d.rectangle([(0, 120), (800, 200)], fill=(106, 147, 176))
+        font = ImageFont.truetype('arial.ttf', size=30)
 
-    font = ImageFont.truetype('arial.ttf', size=30)
+        rows = [(9, 26), (27, 44), (45, 62), (63, 80), (81, 98), (99, 116)][day]
+        dataday = str(df.loc[rows[0], 0])
+        
+        d.text((300,10), 'Расписание на:', font=font, fill=(0, 0, 0))
+        d.text((275, 50), dataday, font=font, fill=(0, 0, 0))
 
-    rows = [(9, 26), (27, 44), (45, 62), (63, 80), (81, 98), (99, 116)][day]
-    dataday = str(df.loc[rows[0], 0])
+        start_y = 200
+        row_height = 40
+        d.text((10, start_y-80), 'Время', font=font, fill=(0, 0, 0))
+        d.text((250, start_y-80), 'Дисциплина', font=font, fill=(0, 0, 0))
+        d.text((650, start_y-80), 'Кабинет', font=font, fill=(0, 0, 0))
 
-    d.text((300, 10), 'Расписание на:', font=font, fill=(0, 0, 0))
-    d.text((275, 50), dataday, font=font, fill=(0, 0, 0))
+        d.line([(240, start_y - 80), (240, start_y + len(df_day) * row_height)], fill=(0, 0, 0), width=2)
+        d.line([(640, start_y - 80), (640, start_y + len(df_day) * row_height)], fill=(0, 0, 0), width=2)
 
-    start_y = 200
-    row_height = 40
-    d.text((10, start_y - 80), 'Время', font=font, fill=(0, 0, 0))
-    d.text((250, start_y - 80), 'Дисциплина', font=font, fill=(0, 0, 0))
-    d.text((650, start_y - 80), 'Кабинет', font=font, fill=(0, 0, 0))
+        for i, row in df_day.iterrows():
+            if row[0] != '':
+                d.line([(0, start_y + i * row_height), (800, start_y + i * row_height)], fill=(0,0,0), width=2)
 
-    d.line([(240, start_y - 80), (240, start_y + len(df_day) * row_height)],
-           fill=(0, 0, 0),
-           width=2)
-    d.line([(640, start_y - 80), (640, start_y + len(df_day) * row_height)],
-           fill=(0, 0, 0),
-           width=2)
+            d.line([(0, start_y - 80), (800, start_y - 80)], fill=(0, 0, 0), width=2)# над таблицей
+            d.line([(0, start_y + len(df_day) * row_height), (800, start_y + len(df_day) * row_height)], fill=(0, 0, 0), width=2)# под таблицей
 
-    for i, row in df_day.iterrows():
-      if row[0] != '':
-        d.line([(0, start_y + i * row_height),
-                (800, start_y + i * row_height)],
-               fill=(0, 0, 0),
-               width=2)
+            d.text((10, start_y + i * row_height), str(row[0]), font=font, fill=(0, 0, 0))
+            d.text((250, start_y + i * row_height), str(row[1]), font=font, fill=(0, 0, 0))
+            d.text((650, start_y + i * row_height), str(row[2]), font=font, fill=(0, 0, 0))
 
-      d.line([(0, start_y - 80), (800, start_y - 80)], fill=(0, 0, 0),
-             width=2)  # над таблицей
-      d.line([(0, start_y + len(df_day) * row_height),
-              (800, start_y + len(df_day) * row_height)],
-             fill=(0, 0, 0),
-             width=2)  # под таблицей
+        buf = BytesIO()
+        img.save(buf, format='jpeg')
+        buf.seek(0)
 
-      d.text((10, start_y + i * row_height),
-             str(row[0]),
-             font=font,
-             fill=(0, 0, 0))
-      d.text((250, start_y + i * row_height),
-             str(row[1]),
-             font=font,
-             fill=(0, 0, 0))
-      d.text((650, start_y + i * row_height),
-             str(row[2]),
-             font=font,
-             fill=(0, 0, 0))
+        photos.append(types.InputMediaPhoto(buf, caption=days_of_week[day]))
 
-    buf = BytesIO()
-    img.save(buf, format='jpeg')
-    buf.seek(0)
-
-    photos.append(types.InputMediaPhoto(buf, caption=days_of_week[day]))
-
-  await bot.send_message(chat_id=callback_query.message.chat.id,
-                         text=f"Расписание для группы {group_name}:",
-                         reply_to_message_id=callback_query.message.message_id)
-  await bot.send_media_group(chat_id=callback_query.message.chat.id,
-                             media=photos)
+    await bot.send_message(chat_id=callback_query.message.chat.id, text=f"Расписание для группы {group_name}:", reply_to_message_id=callback_query.message.message_id)
+    await bot.send_media_group(chat_id=callback_query.message.chat.id, media=photos)
 
 
 @dp.message_handler(filters.Regexp('^Автопостинг из группы ВК'))
